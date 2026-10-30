@@ -17,8 +17,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-retries 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: pip install -r api/requirements.txt -r api/requirements-dev.txt
@@ -26,13 +26,20 @@ jobs:
         working-directory: api
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-        run: pytest -q
+        run: |
+          set -o pipefail
+          pytest -q -rfE 2>&1 | tee pytest.log || {
+            # resumo da falha como anotação (visível sem baixar os logs)
+            msg=$(grep -E "^(FAILED|ERROR|E )" pytest.log | head -15 | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=pytest::${msg:-$(tail -15 pytest.log | sed ':a;N;$!ba;s/\n/%0A/g')}"
+            exit 1
+          }
 
   compose:
     # sobe a pilha completa como numa VM e faz um envio de ponta a ponta
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Configuração de teste
         run: |
           cp .env.example .env
@@ -40,7 +47,14 @@ jobs:
       - run: docker compose config -q
       - run: docker compose up -d --build --wait --wait-timeout 300
       - name: Envio e leitura de ponta a ponta
-        run: bash scripts/smoke-test.sh http://localhost
+        run: |
+          bash scripts/smoke-test.sh http://localhost 2>&1 | tee smoke.log || {
+            msg=$(tail -12 smoke.log | sed ':a;N;$!ba;s/\n/%0A/g')
+            logs=$(docker compose logs --no-color --tail 8 api caddy | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error title=smoke-test::${msg}"
+            echo "::error title=compose-logs::${logs}"
+            exit 1
+          }
       - name: Logs em caso de falha
         if: failure()
         run: docker compose logs --no-color

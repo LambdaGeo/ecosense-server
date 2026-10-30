@@ -126,7 +126,8 @@ DECLARE
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
     bucket := 'time_bucket(''1 hour'', observed_at)';
-    opts   := 'WITH (timescaledb.continuous) AS';
+    -- materialized_only = false: a hora corrente (incompleta) também aparece
+    opts   := 'WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS';
   ELSE
     bucket := 'date_trunc(''hour'', observed_at)';
     opts   := 'AS';
