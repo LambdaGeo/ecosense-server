@@ -1,0 +1,90 @@
+name: ecosense
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  DEVICE_TZ: ${DEVICE_TZ:-America/Fortaleza}
+  SERVER_TZ: ${SERVER_TZ:-UTC}
+
+services:
+  db:
+    image: timescale/timescaledb:2.21.3-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD}
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    environment:
+      <<: *api-env
+      PUBLIC_READ: ${PUBLIC_READ:-true}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 10
+    volumes:
+      - ./data:/data
+    depends_on:
+      db: { condition: service_healthy }
+
+  grafana:
+    image: grafana/grafana-oss:12.1.1
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ANONYMOUS:-true}
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/ecosense.json
+      PG_DB: ${POSTGRES_DB}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      api: { condition: service_healthy }
+      grafana: { condition: service_started }
+
+  # Ponte com o Apps Script: docker compose --profile bridge up -d
+  bridge:
+    build: ./api
+    profiles: [bridge]
+    restart: unless-stopped
+    command: ["python", "-m", "app.bridge"]
+    environment:
+      <<: *api-env
+      APPSSCRIPT_URL: ${APPSSCRIPT_URL}
+      BRIDGE_INTERVAL_S: ${BRIDGE_INTERVAL_S:-60}
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  db-data:
+  grafana-data:
+  caddy-data:

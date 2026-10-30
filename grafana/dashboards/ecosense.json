@@ -1,0 +1,671 @@
+{
+ "uid": "ecosense-main",
+ "title": "EcoSense Monitor",
+ "timezone": "America/Fortaleza",
+ "schemaVersion": 39,
+ "version": 2,
+ "refresh": "1m",
+ "time": {
+  "from": "now-7d",
+  "to": "now"
+ },
+ "description": "Painel padrão do servidor aberto do EcoSense Monitor.",
+ "templating": {
+  "list": [
+   {
+    "name": "station",
+    "label": "Estação",
+    "type": "query",
+    "datasource": {
+     "type": "grafana-postgresql-datasource",
+     "uid": "ecosense-pg"
+    },
+    "query": "SELECT station_id FROM stations ORDER BY 1",
+    "refresh": 1,
+    "current": {}
+   }
+  ]
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "stat",
+   "title": "Estado da estação",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "table",
+     "rawSql": "SELECT CASE\n  WHEN m.observed_at IS NULL THEN 'sem_dados'\n  WHEN m.event_key = 'ENTRANDO_DEEP_SLEEP'\n       AND now() - m.observed_at < make_interval(secs => coalesce(m.tempo_sleep_programado_s, 600) * 2 + 120)\n    THEN 'sono_programado'\n  WHEN now() - m.observed_at < interval '5 minutes' THEN 'online'\n  ELSE 'sem_comunicacao' END AS status\nFROM (SELECT 1) one LEFT JOIN LATERAL (SELECT * FROM readings WHERE station_id = '$station' ORDER BY observed_at DESC LIMIT 1) m ON TRUE"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "mappings": [
+      {
+       "type": "value",
+       "options": {
+        "online": {
+         "text": "Online",
+         "color": "green",
+         "index": 0
+        },
+        "sono_programado": {
+         "text": "Sono programado",
+         "color": "blue",
+         "index": 1
+        },
+        "sem_comunicacao": {
+         "text": "Sem comunicação",
+         "color": "red",
+         "index": 2
+        },
+        "sem_dados": {
+         "text": "Sem dados",
+         "color": "gray",
+         "index": 3
+        }
+       }
+      }
+     ]
+    },
+    "overrides": []
+   },
+   "options": {
+    "colorMode": "background",
+    "textMode": "value",
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ],
+     "fields": "/^status$/"
+    }
+   },
+   "description": "Sono programado: a última mensagem foi ENTRANDO_DEEP_SLEEP e o tempo de sono ainda não estourou."
+  },
+  {
+   "id": 2,
+   "type": "stat",
+   "title": "Última leitura há",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "table",
+     "rawSql": "SELECT extract(epoch FROM now() - max(observed_at))::float8 AS s FROM readings WHERE station_id = '$station' AND kind='reading'"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "none"
+   }
+  },
+  {
+   "id": 3,
+   "type": "stat",
+   "title": "Leituras nas últimas 24 h",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "table",
+     "rawSql": "SELECT count(*) AS leituras FROM readings WHERE station_id = '$station' AND kind='reading' AND observed_at > now() - interval '24 hours'"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "none"
+   }
+  },
+  {
+   "id": 4,
+   "type": "stat",
+   "title": "Instalação atual",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 0,
+    "w": 6,
+    "h": 4
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "table",
+     "rawSql": "SELECT coalesce(site_id, 'indeterminada') AS site FROM readings_located WHERE station_id = '$station' AND kind='reading' ORDER BY observed_at DESC LIMIT 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "none"
+   }
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Temperatura do ar (DHT22) e do BMP180",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 4,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, temperatura_c AS \"DHT22\", temperatura_bmp_c AS \"BMP180\" FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "celsius",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Umidade relativa (DHT22)",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 4,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, umidade_relativa_perc AS \"UR\" FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "humidity",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 7,
+   "type": "timeseries",
+   "title": "Pressão absoluta (BMP180, nível da estação)",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 12,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, pressao_atmosferica_hpa AS \"pressão\" FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "pressurehpa",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 8,
+   "type": "timeseries",
+   "title": "RSSI do Wi-Fi",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 12,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, rssi AS \"RSSI\" FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "dBm",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 9,
+   "type": "timeseries",
+   "title": "Mensagens por hora: leituras e eventos",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 20,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT time_bucket('1 hour', observed_at) AS time, count(*) FILTER (WHERE kind='reading') AS leituras, count(*) FILTER (WHERE kind='event') AS eventos FROM readings WHERE station_id = '$station' AND $__timeFilter(observed_at) GROUP BY 1 ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "lineWidth": 0,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {},
+   "description": "Horas sem barra não receberam nenhuma mensagem."
+  },
+  {
+   "id": 10,
+   "type": "timeseries",
+   "title": "Leituras por instalação (GNSS) por hora",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 20,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT time_bucket('1 hour', observed_at) AS time, coalesce(site_id,'indeterminada') AS metric, count(*) AS value FROM readings_located WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) GROUP BY 1,2 ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "lineWidth": 0,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 11,
+   "type": "table",
+   "title": "Interrupções não programadas (> 15 min)",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 28,
+    "w": 12,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "table",
+     "rawSql": "SELECT gap_start AS \"início\", gap_end AS \"fim\", round((gap_s/60)::numeric,1) AS \"minutos\" FROM gaps WHERE station_id = '$station' AND NOT coalesce(programmed,false) AND gap_s > 900 AND $__timeFilter(gap_end) ORDER BY gap_start DESC"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {},
+   "description": "Intervalos entre mensagens consecutivas que não correspondem a um par ENTRANDO_DEEP_SLEEP → ACORDOU_DEEP_SLEEP. É aqui que aparecem os desligamentos noturnos."
+  },
+  {
+   "id": 12,
+   "type": "timeseries",
+   "title": "Duração do sono (entrada → despertar)",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 28,
+    "w": 12,
+    "h": 9
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT gap_end AS time, gap_s AS \"sono (s)\" FROM gaps WHERE station_id = '$station' AND programmed AND $__timeFilter(gap_end) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 13,
+   "type": "timeseries",
+   "title": "Origem do tempo canônico por hora",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 37,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT time_bucket('1 hour', observed_at) AS time, count(*) FILTER (WHERE ts_source='gnss') AS gnss, count(*) FILTER (WHERE ts_source='device') AS dispositivo, count(*) FILTER (WHERE ts_source='received') AS chegada FROM readings WHERE station_id = '$station' AND $__timeFilter(observed_at) GROUP BY 1 ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "drawStyle": "bars",
+      "fillOpacity": 70,
+      "lineWidth": 0,
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 14,
+   "type": "timeseries",
+   "title": "Defasagem do relógio do dispositivo em relação ao GNSS",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 37,
+    "w": 12,
+    "h": 8
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, clock_skew_s AS \"defasagem\" FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  },
+  {
+   "id": 15,
+   "type": "timeseries",
+   "title": "Aceleração (MPU6050) — referência de instalação",
+   "datasource": {
+    "type": "grafana-postgresql-datasource",
+    "uid": "ecosense-pg"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 45,
+    "w": 24,
+    "h": 7
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "grafana-postgresql-datasource",
+      "uid": "ecosense-pg"
+     },
+     "rawQuery": true,
+     "editorMode": "code",
+     "format": "time_series",
+     "rawSql": "SELECT observed_at AS time, acc_x, acc_y, acc_z FROM readings WHERE station_id = '$station' AND kind = 'reading' AND $__timeFilter(observed_at) ORDER BY 1"
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "spanNulls": false,
+      "lineWidth": 1,
+      "pointSize": 3,
+      "showPoints": "never"
+     }
+    },
+    "overrides": []
+   },
+   "options": {}
+  }
+ ]
+}

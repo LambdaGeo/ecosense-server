@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "Se usar este software, cite-o conforme abaixo e cite o artigo do EcoSense Monitor."
+title: "EcoSense Monitor Server: pilha aberta e auto-hospedável de ingestão, armazenamento e visualização de dados"
+type: software
+version: 1.0.0
+date-released: 2026-10-30
+license: MIT
+repository-code: "https://github.com/LambdaGeo/ecosense-server"
+# doi: 10.5281/zenodo.XXXXXXX   # preencher após o primeiro release no Zenodo
+authors:
+  - family-names: Alves
+    given-names: José Magno Pinheiro
+    affiliation: "Universidade Federal do Maranhão (UFMA)"
+  - family-names: Costa
+    given-names: Sérgio Souza
+    affiliation: "Universidade Federal do Maranhão (UFMA), LambdaGeo"
+    orcid: "https://orcid.org/0000-0002-0232-4549"
+keywords:
+  - hardware aberto
+  - estação meteorológica
+  - ESP32
+  - IoT ambiental
+  - TimescaleDB
+  - Grafana
+  - reprodutibilidade

@@ -1,0 +1,33 @@
+{$DOMAIN} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# limite de corpo também no proxy (a API recusa acima de 256 KiB)
+	request_body {
+		max_size 512KB
+	}
+
+	@api path /ingest/* /api/* /health /docs /openapi.json
+	handle @api {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy grafana:3000
+	}
+
+	log {
+		output stdout
+		# o token da estação vai no caminho de ingestão: nunca registrá-lo
+		format filter {
+			wrap console
+			fields {
+				request>uri regexp ^/ingest/[^/?]+ /ingest/***
+			}
+		}
+	}
+}
