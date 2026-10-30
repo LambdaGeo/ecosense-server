@@ -163,6 +163,16 @@ END $$;
 -- ── Lacunas: intervalos entre mensagens consecutivas maiores que o esperado ─
 -- Um sono programado normal aparece como ENTRANDO_DEEP_SLEEP seguido de
 -- ACORDOU_DEEP_SLEEP; a coluna 'programmed' marca essas lacunas.
+--
+-- Ordem dentro do mesmo instante (empates de segundo GNSS são comuns):
+-- ACORDOU_DEEP_SLEEP antes das leituras, ENTRANDO_DEEP_SLEEP depois delas.
+-- Sem isso, a ordem entre a última leitura e a entrada em sono é arbitrária.
+CREATE OR REPLACE FUNCTION message_order(event_key text)
+RETURNS integer LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT CASE event_key WHEN 'ACORDOU_DEEP_SLEEP' THEN 0
+                        WHEN 'ENTRANDO_DEEP_SLEEP' THEN 2 ELSE 1 END
+$$;
+
 CREATE OR REPLACE VIEW gaps AS
 SELECT station_id,
        prev_at   AS gap_start,
@@ -174,7 +184,8 @@ FROM (
            lag(observed_at) OVER w AS prev_at,
            lag(event_key)   OVER w AS prev_event
     FROM readings
-    WINDOW w AS (PARTITION BY station_id ORDER BY observed_at)
+    WINDOW w AS (PARTITION BY station_id
+                 ORDER BY observed_at, message_order(event_key), kind, event_key)
 ) t
 WHERE prev_at IS NOT NULL AND observed_at - prev_at > INTERVAL '5 minutes';
 

@@ -165,7 +165,7 @@ def summary(conn, a):
           SELECT event_key, extract(epoch FROM lead(observed_at) OVER o - observed_at) d,
                  lead(event_key) OVER o AS nxt
           FROM readings WHERE {w} AND event_key IN ('ENTRANDO_DEEP_SLEEP','ACORDOU_DEEP_SLEEP')
-          WINDOW o AS (ORDER BY observed_at)) t
+          WINDOW o AS (ORDER BY observed_at, message_order(event_key))) t
         WHERE event_key='ENTRANDO_DEEP_SLEEP' AND nxt='ACORDOU_DEEP_SLEEP'""")
     (n_batt,), = q(f"SELECT count(status_bateria_v) FROM readings WHERE {w}")
     stats = q(f"""SELECT 'temperatura_c', count(temperatura_c), avg(temperatura_c), stddev(temperatura_c),

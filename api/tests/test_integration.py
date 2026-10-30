@@ -158,3 +158,18 @@ def test_importacao_csv_da_planilha(setup, conn, tmp_path, capsys):
     assert "Horas civis com ao menos uma leitura 1 de 24" in out
     assert "Intervalo mediano entre leituras ... 30.00 s" in out
     assert "(indeterminada)........." in out
+
+
+@pytest.mark.parametrize("event_first", [True, False])
+def test_sono_programado_independe_da_ordem_de_chegada(setup, conn, capsys, event_first):
+    """Última leitura e ENTRANDO_DEEP_SLEEP no mesmo segundo GNSS: a lacuna
+    seguinte é sono programado qualquer que seja a ordem de inserção."""
+    c, (tok1, _) = setup
+    last, sleep = reading("12:00:30"), event("12:00:30", "ENTRANDO_DEEP_SLEEP")
+    wake, after = event("12:10:41", "ACORDOU_DEEP_SLEEP"), reading("12:10:41")
+    msgs = [sleep, last, after, wake] if event_first else [last, sleep, wake, after]
+    for m in msgs:  # uma requisição por mensagem, como o firmware
+        c.post(f"/ingest/{tok1}", json=m)
+    k = key_for(conn, capsys, "lab")
+    gaps = c.get("/api/v1/gaps", headers={"X-API-Key": k}).json()
+    assert [(round(g["gap_s"]), g["programmed"]) for g in gaps] == [(611, True)]
